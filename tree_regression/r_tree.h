@@ -19,19 +19,18 @@ class RegressionTree
         struct Node;
         struct Split;
     public:
-        //RegressionTree();
         RegressionTree(unsigned depth = 10, unsigned leaf_k = 5);
         RegressionTree(RegressionTree const&) = default;
-        // ~RegressionTree() { delete root; }
         ~RegressionTree();
         RegressionTree& operator=(RegressionTree const&) = default;
         double predict(double x1, double x2)const;
         void set_leaf_threshold(unsigned leaf) { leaf_threshold = leaf; }
         void set_max_depth(unsigned depth) { max_depth = depth; }
         void train(Training_data const&);
+        void dump(std::string const& filename)const;
+        void import(std::string const& filename);
     private:
         void train(Node*& element, Training_data const&, Node* const& parent = nullptr);
-        // double mean_y(Training_data const& train_data);
         unsigned max_depth; 
         unsigned leaf_threshold;
         Node* root; 
@@ -48,6 +47,7 @@ class RegressionTree
                 double threshold;
                 // double quality;      
                 // Split* next;
+                std::string to_string()const;
             };
 
             Node(); 
@@ -56,9 +56,12 @@ class RegressionTree
             Node& operator=(Node const&) = default;
             Node(Node* const&, Split* const&); 
             Node(Split* const&); 
-            ~Node() ;
+            // Node(int depth, int value);
+            // Node(int depth, int value, int var_idx, int threshold);
+            ~Node();
             double predict(double x1, double x2)const;
             double gini_impurity(Training_data const&)const;
+            std::string to_string()const;
             Node* parent;
             Node* right;
             Node* left;

@@ -5,7 +5,9 @@
 #include <limits>
 #include <algorithm>
 #include <iostream>
-
+#include <fstream>
+#include <stack>
+#include <sstream>
 /* Self created library files */ 
 // #include <type_printing>
 /* ************************** */
@@ -18,34 +20,93 @@
 RegressionTree::~RegressionTree() 
 {
     /* Recursive call via ~Node, no need to iterate through tree */ 
-    // Node* tmp {root};
-    // while(tmp)
-    // {
-        // if(tmp->left)
-            // tmp = tmp->left;
-        // else if(tmp->right)
-            // tmp = tmp->right;
-        // else
-        // {
-            // Node* tmp_del = tmp;
-// 
-            // if(tmp_del->split)
-            // {
-                // delete tmp_del->split;
-                // tmp_del->split = nullptr;
-            // }
-// 
-            // tmp = tmp->parent;
-            // if(tmp && tmp->left == tmp_del)
-                // tmp->left = nullptr;
-            // else if(tmp && tmp->right == tmp_del)
-                // tmp->right = nullptr;
-// 
-            // delete tmp_del;
-        // }
-    // } 
-
     delete root;
+}
+
+/* Using preorder traversal through tree */ 
+void RegressionTree::dump(std::string const& filename)const
+{
+    try{
+        std::ofstream out_file {filename};
+        std::stack<Node*> context {};
+        context.push(root);
+
+        while(!context.empty())
+        {
+            /* Look ahead on top to avoid issue when popping nullptr */ 
+            Node* tmp = context.top();
+            context.pop();
+            out_file << tmp -> to_string() << std::endl;
+            if(tmp->split)
+            {
+                context.push(tmp->right);
+                context.push(tmp->left);
+            }
+        }
+    } catch(std::exception& e) {
+        std::cerr << "Could not open/write to file \"" << filename 
+            << "\" in function RegressionTree::dump. " << e.what() 
+            << ". Try again." << std::endl; 
+    }
+}
+
+void RegressionTree::import(std::string const& filename)
+{
+    try{
+        std::ifstream in_file {filename};
+        std::string row;
+        int depth {};
+        double value {}; 
+        int var_idx{};
+        double threshold {};
+
+        Node* tmp = nullptr;
+
+        while(std::getline(in_file, row))
+        {
+            std::stringstream ss {row}; 
+            ss >> depth >> value;
+
+            if(root == nullptr)
+            {
+                root = new Node();
+                root -> value = value;
+                tmp = root;
+            }
+            else
+            {
+                if(tmp -> depth < depth)
+                {
+                    tmp -> left = new Node(tmp);
+                    tmp -> left -> value = value;
+                    tmp = tmp -> left;
+                }
+                else
+                {
+                    /* Jump to correct node to insert */ 
+                    do{
+                        tmp = tmp -> parent;
+                    }while(tmp -> depth != depth-1);
+
+                    tmp -> right = new Node(tmp);
+                    tmp -> right -> value = value;
+                    tmp = tmp -> right; 
+                }
+            }
+
+            /* If there's more data on row the node has a split */
+            if(ss.rdbuf() -> in_avail() != 0)
+            {        
+                ss >> var_idx >> threshold;
+                tmp -> split = new Node::Split(threshold, var_idx);
+            } 
+            
+        }
+    } catch(std::exception& e){
+        std::cerr << "Could not open/read from file \"" << filename 
+            << "\" in function RegressionTree::import. " << e.what() 
+            << ". Try again." << std::endl; 
+    }
 }
 
 template <class T = void>
@@ -122,7 +183,7 @@ double RegressionTree::Node::predict(double x1, double x2)const
 {
     /* If there has been a split at this node,
      * check which way to descend for this datapoint to reach leaf node. 
-     * If there is no split = leaf node is reached, return value of the node
+     * No split = leaf node is reached, return value of the node
      */
 
 #if DEBUG == 1
@@ -143,9 +204,28 @@ double RegressionTree::Node::predict(double x1, double x2)const
         return value; 
 }
 
+std::string RegressionTree::Node::to_string()const
+{
+    std::stringstream ss {};
+    std::string splitstring {};
+    ss << depth << " " << value;
+    if(split)
+        ss << " " << split->to_string();
+
+    return ss.str();
+}
+
+
+std::string RegressionTree::Node::Split::to_string()const
+{
+    std::stringstream ss {};
+    ss << var_idx << " " << threshold;
+    return ss.str();
+}
+
 inline bool RegressionTree::Node::Split::predict(double x1, double x2)const
 {
-    /* Only covers two variables atm, might make better */ 
+    /* Only covers two variables atm, should do better */ 
     //std::cout << "Going into node::split" << std::endl;
     bool return_bool {};
     if(var_idx == 0)
@@ -190,7 +270,7 @@ void RegressionTree::train(Training_data const& train_data)
  *             calculate residual between temp_node and point j
  *     Select node with smallest residual
  * Select feature with smallest residual
- * Create child_nodes if both have more than K points to them
+ * Create child_nodes if both have more than K points attached to them
  */
 void RegressionTree::train(Node*& element, Training_data const& train_data, Node* const& parent)
 {

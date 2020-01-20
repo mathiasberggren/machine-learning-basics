@@ -7,43 +7,59 @@
 #include <iostream>
 
 /* Self created library files */ 
-#include <type_printing>
+// #include <type_printing>
 /* ************************** */
 #include "r_tree.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #define DEBUG_TRAIN_FUNCTION 0
-/*
-RegressionTree::RegressionTree()
-    :  max_depth{10}, root{nullptr},
-{}
-*/
 
-// template <class T = void>
-// struct sum_trainingdata_y
-// {
-//     constexpr double operator()(double const& lhs, T const& rhs)
-//     {
-//         //std::cout << type_name<decltype(lhs)>() << std::endl; 
-//         return lhs + rhs.second;
-//     }
-// };
 
-// template <class T = void>
-// constexpr double operator()(double const& lhs, T const& rhs)
-// {
-//     //std::cout << type_name<decltype(lhs)>() << std::endl; 
-//     return lhs + rhs.second;
-// }
+RegressionTree::~RegressionTree() 
+{
+    /* Recursive call via ~Node, no need to iterate through tree */ 
+    // Node* tmp {root};
+    // while(tmp)
+    // {
+        // if(tmp->left)
+            // tmp = tmp->left;
+        // else if(tmp->right)
+            // tmp = tmp->right;
+        // else
+        // {
+            // Node* tmp_del = tmp;
+// 
+            // if(tmp_del->split)
+            // {
+                // delete tmp_del->split;
+                // tmp_del->split = nullptr;
+            // }
+// 
+            // tmp = tmp->parent;
+            // if(tmp && tmp->left == tmp_del)
+                // tmp->left = nullptr;
+            // else if(tmp && tmp->right == tmp_del)
+                // tmp->right = nullptr;
+// 
+            // delete tmp_del;
+        // }
+    // } 
 
+    delete root;
+}
+
+template <class T = void>
+struct sum_trainingdata_y
+{
+    constexpr double operator()(double const& lhs, T const& rhs)
+    {
+        return lhs + rhs.second;
+    }
+};
 
 double mean_y(Training_data const& train_data)
 {
-    auto lambda = [](auto const& a, auto const& b){return a + b.second; };
-    //return a.second + b.second; };>() << std::endl; }
-    //return std::accumulate(std::begin(train_data), std::end(train_data), 0.0, sum_trainingdata_y<decltype(*std::begin(train_data))>()) / std::size(train_data);
-    // return std::accumulate(std::begin(train_data), std::end(train_data), 0.0, sum_trainingdata_y<std::pair<std::vector<double>,double>>()) / std::size(train_data);
-    return std::accumulate(std::begin(train_data), std::end(train_data), 0.0, lambda) / std::size(train_data);
+    return std::accumulate(std::begin(train_data), std::end(train_data), 0.0, sum_trainingdata_y<decltype(*std::begin(train_data))>()) / train_data.size();
 }
 
 
@@ -76,12 +92,21 @@ RegressionTree::Node::Node(Split* const& s)
 
 RegressionTree::Node::~Node()
 { 
-    if(split)
+    if(split != nullptr)
+    {
         delete split; 
-    if(left)
+        split == nullptr;
+    }
+    if(left != nullptr)
+    {
         delete left; 
-    if(right)
+        left == nullptr;
+    }
+    if(right != nullptr)
+    {
         delete right; 
+        right == nullptr;
+    }
 }
 
 RegressionTree::Node::Split::Split(double threshold, int feature)
@@ -143,23 +168,30 @@ inline bool RegressionTree::Node::Split::predict(double x1, double x2)const
 void RegressionTree::train(Training_data const& train_data)
 {
     assert(train_data.size() != 0 && train_data[0].first.size() != 0);
+
+    /* If we have a fitted tree, remove it */ 
+    if(root != nullptr)
+    {
+        delete root;
+        root = nullptr;
+    }
     /* Call recursive train function */ 
     train(root, train_data);
 }
 
 
 /* Regression tree pseudo code ~(ish, done by myself)
-* K = Hyperparameter for # of points required to create a separate node
-*
-* For all features
-*     For all datapoints (i)
-*         temp_node = mean value between point[i] and point[i+1]
-*         for all datapoints (j)
-*             calculate residual between temp_node and point j
-*     Select node with smallest residual
-* Select feature with smallest residual
-* Create child_nodes if both have more than K points to them
-*/
+ * K = Hyperparameter for # of points required to create a separate node
+ *
+ * For all features
+ *     For all datapoints (i)
+ *         temp_node = mean value between point[i] and point[i+1]
+ *         for all datapoints (j)
+ *             calculate residual between temp_node and point j
+ *     Select node with smallest residual
+ * Select feature with smallest residual
+ * Create child_nodes if both have more than K points to them
+ */
 void RegressionTree::train(Node*& element, Training_data const& train_data, Node* const& parent)
 {
 
@@ -169,21 +201,25 @@ void RegressionTree::train(Node*& element, Training_data const& train_data, Node
     /* If we reached max depth, dont create new node */ 
     if(parent && parent->depth + 2 > max_depth)
     {
-        // std::cout << "Max depth was hit, quitting training" << std::endl;
+#if DEBUG_TRAINING_FUNCTION == 1
+        std::cout << "Max depth was hit, quitting training" << std::endl;
+#endif
         element = nullptr;
         return;
     }
 
     if(train_data.size() < leaf_threshold * 2)
     {
-        // std::cout << "Not enough data left to train on for node, returning" << std::endl;
+#if DEBUG_TRAINING_FUNCTION == 1
+        std::cout << "Not enough data left to train on for node, returning" << std::endl;
+#endif
         element = nullptr;
         return;
     }
     size_t num_features {train_data[0].first.size()};
-    
+
     //double gini_values[num_features] {};
-    
+
 
     /* Keeps track of how the node with the best split looks
      * 0 = residual for all datapoints for that node, 
@@ -228,7 +264,7 @@ void RegressionTree::train(Node*& element, Training_data const& train_data, Node
                  * into the possibly new left/right leaf nodes */
                 if(mean[i] < train_sample.first[i])
                     ++k_count[i];
-                
+
             }
         }
 
@@ -252,18 +288,21 @@ void RegressionTree::train(Node*& element, Training_data const& train_data, Node
                 }
             }
         }
+        delete[] mean;
+        delete[] k_count;
+        delete[] residual;
     }
 
-#if DEBUG == 1
+#if DEBUG_TRAIN_FUNCTION == 1
     for(unsigned i {}; i < num_features; i++)
         std::cout << "best residual: " << best_split[i][0] << " for feature " << i << std::endl;
 #endif
     /* Should hopefully have best possible node from each feature */
-    
+
     auto max = std::max_element(best_split.begin(), best_split.end(), 
             [](auto const& el1, auto const& el2)
             {
-                return el1[0] > el2[0]; 
+            return el1[0] > el2[0]; 
             });
 
     /* Create a new node with new split */ 
@@ -275,11 +314,11 @@ void RegressionTree::train(Node*& element, Training_data const& train_data, Node
     Node::Split* split = new Node::Split((*max)[1], (*max)[2]);
 #if DEBUG == 1
     std::cout << "The residual was: " << (*max)[0] << " the feature chosen for split was: " << (*max)[2] << \
-            " and the threshold is: " << (*max)[1] << std::endl;
+        " and the threshold is: " << (*max)[1] << std::endl;
 #endif
     element = new Node(parent, split);
 
-    
+
     /* Split training data depending on split and then send it down recursively */ 
     Training_data t1 {};
     Training_data t2 {};
@@ -294,15 +333,12 @@ void RegressionTree::train(Node*& element, Training_data const& train_data, Node
 
     train(element->left, t1, element);
     train(element->right, t2, element);
-#if DEBUG == 1
-    if(element->left == nullptr)
-        std::cout << " our left is a nullptr,";
-    if(element->right == nullptr)
-        std::cout << "our right is a nullptr";
-#endif
-    double mean_y_val = mean_y(train_data);
+#if DEBUG_TRAIN_FUNCTION == 1
     std::cout << "This is our left ptr: " << element->left << \
         " and this is our right ptr: " << element->right << std::endl;
+#endif
+
+    double mean_y_val = mean_y(train_data);
     if(element->left == nullptr && element->right == nullptr)
     {
         delete element->split;
@@ -310,7 +346,7 @@ void RegressionTree::train(Node*& element, Training_data const& train_data, Node
         element->value = mean_y(train_data);
 
 #if DEBUG == 1
-    std::cout << "This is the mean_y_val: " << mean_y_val << std::endl;
+        std::cout << "This is the mean_y_val: " << mean_y_val << std::endl;
 #endif
 
     }
@@ -331,7 +367,7 @@ void RegressionTree::train(Node*& element, Training_data const& train_data, Node
         element->value = mean_y(train_data); 
 
 #if DEBUG == 1
-    std::cout << "This is the mean_y_val: " << mean_y_val << std::endl;
+        std::cout << "This is the mean_y_val: " << mean_y_val << std::endl;
 #endif
 
     }   
@@ -339,4 +375,3 @@ void RegressionTree::train(Node*& element, Training_data const& train_data, Node
     // (*max)[1] = mean value for node
     // (*max)[2] = feature 
 }
-

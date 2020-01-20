@@ -22,9 +22,12 @@ class RegressionTree
         //RegressionTree();
         RegressionTree(unsigned depth = 10, unsigned leaf_k = 5);
         RegressionTree(RegressionTree const&) = default;
-        ~RegressionTree() { delete root; }
+        // ~RegressionTree() { delete root; }
+        ~RegressionTree();
         RegressionTree& operator=(RegressionTree const&) = default;
         double predict(double x1, double x2)const;
+        void set_leaf_threshold(unsigned leaf) { leaf_threshold = leaf; }
+        void set_max_depth(unsigned depth) { max_depth = depth; }
         void train(Training_data const&);
     private:
         void train(Node*& element, Training_data const&, Node* const& parent = nullptr);
